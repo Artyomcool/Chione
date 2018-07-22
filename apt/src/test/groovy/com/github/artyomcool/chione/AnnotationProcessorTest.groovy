@@ -100,9 +100,12 @@ class AnnotationProcessorTest {
         }.join('\n\n')
     }
 
-
     ChioneModule<?, ?> generateModule(String name, String... sources) {
-        return generate(sources).loadClass(name).newInstance(new InMemoryDataFile()) as ChioneModule<?, ?>
+        return generateModule(new InMemoryDataFile(), name, sources)
+    }
+
+    ChioneModule<?, ?> generateModule(DataFile dataFile, String name, String... sources) {
+        return generate(sources).loadClass(name).newInstance(dataFile) as ChioneModule<?, ?>
     }
 
     ChioneModule<?, ?> oneFieldModule(String type) {
@@ -418,6 +421,92 @@ class AnnotationProcessorTest {
         assert !nextEntry.data().isLoaded()
         assert nextEntry.data().get() == "Hey!"
         assert nextEntry.data().isLoaded()
+    }
+
+    @Test
+    void fieldRemoval() {
+        def fullData =
+                """
+                    package test;
+
+                    import com.github.artyomcool.chione.Ice;
+                    
+                    @Ice
+                    public interface SomeEntry {
+                        
+                        String field1();
+                        
+                        void field1(String data);
+                        
+                        String field2();
+                        
+                        void field2(String data);
+                      
+                        String field3();
+                        
+                        void field3(String data);
+                        
+                    }
+
+                """
+
+        def noField2Data =
+                """
+                    package test;
+
+                    import com.github.artyomcool.chione.Ice;
+                    
+                    @Ice
+                    public interface SomeEntry {
+                        
+                        String field1();
+                        
+                        void field1(String data);
+                        
+                        String field3();
+                        
+                        void field3(String data);
+                        
+                    }
+
+                """
+
+        def factoryClass =
+                """
+                    package test;
+                    
+                    import com.github.artyomcool.chione.Factory;
+                    
+                    @Factory(root = SomeEntry.class)
+                    public interface SomeFactory {
+                        
+                        SomeEntry createEntry();
+                        
+                    }
+                """
+
+        def dataFile = new InMemoryDataFile()
+        def fullModule = generateModule(dataFile,"test.SomeFactoryModule", fullData, factoryClass)
+        def noField2Module = generateModule(dataFile,"test.SomeFactoryModule", noField2Data, factoryClass)
+
+        def entry = fullModule.factory().createEntry()
+        entry.field1("f1")
+        entry.field2("f2")
+        entry.field3("f3")
+
+        fullModule.chione().save(entry)
+
+        def nextEntry = noField2Module.chione().load()
+
+        assert nextEntry.field1() == "f1"
+        assert nextEntry.field3() == "f3"
+
+        try {
+            nextEntry.field2()
+
+            throw new IllegalStateException("Method field2 still generated")
+        } catch (MissingMethodException ignored) {
+        }
     }
 
 }

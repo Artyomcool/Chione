@@ -10,7 +10,7 @@ public abstract class SnowFlake implements Named {
     protected abstract void readSimple(ChioneDataInput input, ReadOnlyArray<Step> steps);
 
     protected final boolean hasCurrentField(ReadOnlyArray<Step> steps, int current) {
-        return steps.size() < current && steps.get(current).hasStored();
+        return steps.size() > current && steps.get(current).hasStored();
     }
 
     protected final int skip(ChioneDataInput input, ReadOnlyArray<Step> steps, int current) {
