@@ -402,4 +402,22 @@ class AnnotationProcessorTest {
         assert nextData[2] == "Last tag"
     }
 
+    @Test
+    void lazy() {
+        def module = oneFieldModule("com.github.artyomcool.chione.Lazy<String>")
+        def factory = module.factory()
+        def chione = module.chione()
+
+        def entry = factory.createEntry()
+        entry.data(new Lazy<>("Hey!"))
+
+        chione.save(entry)
+
+        def nextEntry = chione.load()
+
+        assert !nextEntry.data().isLoaded()
+        assert nextEntry.data().get() == "Hey!"
+        assert nextEntry.data().isLoaded()
+    }
+
 }

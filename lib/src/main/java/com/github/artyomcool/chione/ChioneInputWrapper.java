@@ -151,7 +151,7 @@ public class ChioneInputWrapper implements ChioneDataInput {
 
         WrapperDeserializationContext deinit() {
             if (!hooked) {
-                throw new ChioneException();
+                throw new ChioneException("DeserializationContext.hookCreation hasn't been called during " + descriptor.getClassName() + " deserialization");
             }
             hooked = false;
             return this;

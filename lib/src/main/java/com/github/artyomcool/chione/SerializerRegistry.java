@@ -131,7 +131,7 @@ public class SerializerRegistry implements ChioneSerializer<Object> {
             }
         });
 
-        this.serializers.put(Lazy.CLASS_NAME, Lazy.REGISTRY);
+        register(Lazy.class, Lazy.CLASS_NAME, Lazy.REGISTRY);
 
         this.serializers.putAll(serializers);
 

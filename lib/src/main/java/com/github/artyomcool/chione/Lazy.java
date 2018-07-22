@@ -23,7 +23,7 @@ public class Lazy<T> {
         @Override
         public Lazy<Object> deserialize(DeserializationContext context) {
             ChioneDataInput input = context.input();
-            return new Lazy<Object>(new LazyData(input, input.pos()));
+            return context.hookCreation(new Lazy<Object>(new LazyData(input, input.pos())));
         }
     };
 
@@ -38,6 +38,10 @@ public class Lazy<T> {
             lazy = ((LazyData) lazy).inflate();
         }
         return unsafeCast(lazy);
+    }
+
+    boolean isLoaded() {
+        return !(lazy instanceof LazyData);
     }
 
     private static class LazyData {
