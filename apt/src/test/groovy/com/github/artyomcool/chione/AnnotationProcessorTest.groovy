@@ -509,4 +509,83 @@ class AnnotationProcessorTest {
         }
     }
 
+    @Test
+    void fieldAddition() {
+        def fullData =
+                """
+                    package test;
+
+                    import com.github.artyomcool.chione.Ice;
+                    
+                    @Ice
+                    public interface SomeEntry {
+                        
+                        String field1();
+                        
+                        void field1(String data);
+                        
+                        String field2();
+                        
+                        void field2(String data);
+                      
+                        String field3();
+                        
+                        void field3(String data);
+                        
+                    }
+
+                """
+
+        def noField2Data =
+                """
+                    package test;
+
+                    import com.github.artyomcool.chione.Ice;
+                    
+                    @Ice
+                    public interface SomeEntry {
+                        
+                        String field1();
+                        
+                        void field1(String data);
+                        
+                        String field3();
+                        
+                        void field3(String data);
+                        
+                    }
+
+                """
+
+        def factoryClass =
+                """
+                    package test;
+                    
+                    import com.github.artyomcool.chione.Factory;
+                    
+                    @Factory(root = SomeEntry.class)
+                    public interface SomeFactory {
+                        
+                        SomeEntry createEntry();
+                        
+                    }
+                """
+
+        def dataFile = new InMemoryDataFile()
+        def fullModule = generateModule(dataFile,"test.SomeFactoryModule", fullData, factoryClass)
+        def noField2Module = generateModule(dataFile,"test.SomeFactoryModule", noField2Data, factoryClass)
+
+        def entry = noField2Module.factory().createEntry()
+        entry.field1("f1")
+        entry.field3("f3")
+
+        noField2Module.chione().save(entry)
+
+        def nextEntry = fullModule.chione().load()
+
+        assert nextEntry.field1() == "f1"
+        assert nextEntry.field2() == null
+        assert nextEntry.field3() == "f3"
+    }
+
 }
