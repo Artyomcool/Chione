@@ -378,4 +378,28 @@ class AnnotationProcessorTest {
         assert nextEntry.data() == original
     }
 
+    @Test
+    void recursiveArrayList() {
+        def module = oneFieldModule("java.util.ArrayList<Object>")
+        def factory = module.factory()
+        def chione = module.chione()
+
+        def entry = factory.createEntry()
+
+        def original = ["First tag"] as ArrayList<Object>
+        original.add(original)
+        original.add("Last tag")
+
+        entry.data(original)
+        chione.save(entry)
+
+        def nextEntry = chione.load()
+        List<?> nextData = nextEntry.data()
+
+        assert nextData.size() == 3
+        assert nextData[0] == "First tag"
+        assert nextData[1] == nextData
+        assert nextData[2] == "Last tag"
+    }
+
 }
