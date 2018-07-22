@@ -164,10 +164,25 @@ class IceProcessor extends Processor<Ice> {
                     builder.addStatement("output.writeReference(this.$L)", descriptor.name());
                     break;
                 case BOOLEAN:
-                    builder.addStatement("output.write(this.$L ? 1 : 0)", descriptor.name());
+                    builder.addStatement("output.write(this.$L ? (byte) 1 : (byte) 0)", descriptor.name());
+                    break;
+                case CHAR:
+                    builder.addStatement("output.write((short) this.$L)", descriptor.name());
+                    break;
+                case FLOAT:
+                    builder.addStatement("output.write(Float.floatToRawIntBits(this.$L))", descriptor.name());
+                    break;
+                case DOUBLE:
+                    builder.addStatement("output.write(Double.doubleToRawLongBits(this.$L))", descriptor.name());
+                    break;
+                case BYTE:
+                case SHORT:
+                case INT:
+                case LONG:
+                    builder.addStatement("output.write(this.$L)", descriptor.name());
                     break;
                 default:
-                    builder.addStatement("output.write(this.$L)", descriptor.name());
+                    throw new IllegalArgumentException("Unsupported type: " + descriptor.getter().getReturnType());
             }
         }
         return builder.build();
@@ -197,6 +212,9 @@ class IceProcessor extends Processor<Ice> {
                 case SHORT:
                     builder.addStatement("this.$L = input.readShort()", descriptor.name());
                     break;
+                case CHAR:
+                    builder.addStatement("this.$L = (char) input.readShort()", descriptor.name());
+                    break;
                 case INT:
                     builder.addStatement("this.$L = input.readInt()", descriptor.name());
                     break;
@@ -204,10 +222,10 @@ class IceProcessor extends Processor<Ice> {
                     builder.addStatement("this.$L = input.readLong()", descriptor.name());
                     break;
                 case FLOAT:
-                    builder.addStatement("this.$L = input.readFloat()", descriptor.name());
+                    builder.addStatement("this.$L = Float.intBitsToFloat(input.readInt())", descriptor.name());
                     break;
                 case DOUBLE:
-                    builder.addStatement("this.$L = input.readDouble()", descriptor.name());
+                    builder.addStatement("this.$L = Double.longBitsToDouble(input.readLong())", descriptor.name());
                     break;
             }
             if (withSteps) {

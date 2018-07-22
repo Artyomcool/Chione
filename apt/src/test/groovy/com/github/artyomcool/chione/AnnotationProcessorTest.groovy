@@ -105,55 +105,8 @@ class AnnotationProcessorTest {
         return generate(sources).loadClass(name).newInstance(new InMemoryDataFile()) as ChioneModule<?, ?>
     }
 
-    @Test
-    void stringTest() {
-        def A =
-                """
-                    package a;
-                    
-                    @com.github.artyomcool.chione.Ice
-                    public interface A {
-                        
-                        String t();
-                        
-                        void t(String t);
-                        
-                    }
-
-                """
-
-        def F = """
-                    package b;
-                    
-                    @com.github.artyomcool.chione.Factory(root = a.A.class)
-                    public interface F {
-                        
-                        a.A a();
-                        
-                    }
-                """
-
-        def module = generateModule("b.FModule", A, F)
-        def factory = module.factory()
-        def chione = module.chione()
-
-        def a = factory.a()
-
-        a.t("test text")
-        chione.save(a)
-
-        def nextA = chione.load()
-
-        assert a != nextA
-        assert !(a.t().is(nextA.t()))
-        assert a.t() == nextA.t()
-        assert nextA.t() == "test text"
-    }
-
-    @Test
-    @Parameters(["boolean", "byte", "short", "char", "int", "float", "long", "double", "String", "String[]"])
-    void arrayTest(String type) {
-        def A =
+    ChioneModule<?, ?> oneFieldModule(String type) {
+        def someEntryClass =
                 """
                     package test;
 
@@ -162,19 +115,16 @@ class AnnotationProcessorTest {
                     @Ice
                     public interface SomeEntry {
                         
-                        $type[] data();
+                        $type data();
                         
-                        void data($type[] data);
-
-                        String anotherData();
-                        
-                        void anotherData(String str);
+                        void data($type t);
                         
                     }
 
                 """
 
-        def F = """
+        def factoryClass =
+                """
                     package test;
                     
                     import com.github.artyomcool.chione.Factory;
@@ -187,7 +137,58 @@ class AnnotationProcessorTest {
                     }
                 """
 
-        def module = generateModule("test.SomeFactoryModule", A, F)
+        return generateModule("test.SomeFactoryModule", someEntryClass, factoryClass)
+    }
+
+    @Test
+    @Parameters(["String"])
+    void object(String type) {
+        def module = oneFieldModule(type)
+        def factory = module.factory()
+        def chione = module.chione()
+
+        def entry = factory.createEntry()
+
+        def clazz = entry.getClass().getMethod("data").returnType;
+        def original = 90.asType(clazz)
+
+        entry.data(original)
+        chione.save(entry)
+
+        def nextEntry = chione.load()
+
+        assert entry != nextEntry
+        assert !(entry.data().is(nextEntry.data()))
+        assert entry.data() == nextEntry.data()
+        assert nextEntry.data() == original
+    }
+
+    @Test
+    @Parameters(["boolean", "byte", "short", "char", "int", "float", "long", "double"])
+    void primitive(String type) {
+        def module = oneFieldModule(type)
+        def factory = module.factory()
+        def chione = module.chione()
+
+        def entry = factory.createEntry()
+
+        def clazz = entry.getClass().getMethod("data").returnType;
+        def original = 90.asType(clazz)
+
+        entry.data(original)
+        chione.save(entry)
+
+        def nextEntry = chione.load()
+
+        assert entry != nextEntry
+        assert entry.data() == nextEntry.data()
+        assert nextEntry.data() == original
+    }
+
+    @Test
+    @Parameters(["boolean", "byte", "short", "char", "int", "float", "long", "double", "String", "String[]"])
+    void array(String type) {
+        def module = oneFieldModule("$type[]")
         def factory = module.factory()
         def chione = module.chione()
 
