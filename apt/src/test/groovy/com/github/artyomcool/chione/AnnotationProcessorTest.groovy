@@ -208,4 +208,108 @@ class AnnotationProcessorTest {
         assert nextEntry.data() == original
     }
 
+    @Test
+    void selfReferencing() {
+        def module = oneFieldModule("SomeEntry")
+        def factory = module.factory()
+        def chione = module.chione()
+
+        def entry = factory.createEntry()
+        entry.data(entry)
+        chione.save(entry)
+
+        def nextEntry = chione.load()
+
+        assert !entry.is(nextEntry)
+        assert entry.data().is(entry)
+        assert nextEntry.data().is(nextEntry)
+    }
+
+    @Test
+    void recursiveReferencing() {
+        def someEntryClass =
+                """
+                    package test;
+
+                    import com.github.artyomcool.chione.Ice;
+                    
+                    @Ice
+                    public interface SomeEntry {
+                        
+                        SomeAnotherEntry anotherEntry();
+                        
+                        void anotherEntry(SomeAnotherEntry entry);
+                        
+                        String tagToVerify();
+                        
+                        void tagToVerify(String tag);
+                        
+                    }
+
+                """
+
+        def someAnotherEntryClass =
+                """
+                    package test;
+
+                    import com.github.artyomcool.chione.Ice;
+                    
+                    @Ice
+                    public interface SomeAnotherEntry {
+                        
+                        SomeEntry entry();
+                        
+                        void entry(SomeEntry entry);
+                        
+                        String tagToVerify();
+                        
+                        void tagToVerify(String tag);
+                        
+                    }
+
+                """
+
+        def factoryClass =
+                """
+                    package test;
+                    
+                    import com.github.artyomcool.chione.Factory;
+                    
+                    @Factory(root = SomeEntry.class)
+                    public interface SomeFactory {
+                        
+                        SomeEntry createEntry();
+                        
+                        SomeAnotherEntry createAnotherEntry();
+                        
+                    }
+                """
+
+        def module = generateModule("test.SomeFactoryModule", someEntryClass, someAnotherEntryClass, factoryClass)
+        def factory = module.factory()
+        def chione = module.chione()
+
+        def entry = factory.createEntry()
+        def anotherEntry = factory.createAnotherEntry()
+
+        entry.anotherEntry(anotherEntry)
+        anotherEntry.entry(entry)
+
+        entry.tagToVerify("Entry tag")
+        anotherEntry.tagToVerify("Another entry tag")
+
+        chione.save(entry)
+
+        def nextEntry = chione.load()
+        def nextAnotherEntry = nextEntry.anotherEntry()
+
+        assert !entry.is(nextEntry)
+        assert !anotherEntry.is(nextAnotherEntry)
+
+        assert nextEntry.is(nextAnotherEntry.entry())
+
+        assert nextEntry.tagToVerify() == "Entry tag"
+        assert anotherEntry.tagToVerify() == "Another entry tag"
+    }
+
 }
