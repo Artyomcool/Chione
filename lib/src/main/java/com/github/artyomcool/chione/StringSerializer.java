@@ -2,7 +2,7 @@ package com.github.artyomcool.chione;
 
 public class StringSerializer implements ChioneSerializer<String> {
 
-    public static final String CLASS_NAME = "java.lang.String";
+    public static final String CLASS_NAME = "$String";
     public static final ChioneDescriptor DESCRIPTOR = new ChioneDescriptor(CLASS_NAME);
     public static final int DESCRIPTOR_STATIC_REFERENCE = Integer.MAX_VALUE;
     public static final StringSerializer INSTANCE = new StringSerializer();

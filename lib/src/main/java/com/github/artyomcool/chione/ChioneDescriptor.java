@@ -4,7 +4,7 @@ import java.util.*;
 
 public class ChioneDescriptor implements Named {
 
-    static final String CLASS_NAME = "ChioneDescriptor";
+    static final String CLASS_NAME = "$ChioneDescriptor";
 
     private static final int CURRENT_VERSION = 1;
 

@@ -1,38 +1,19 @@
 package com.github.artyomcool.chione;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static com.github.artyomcool.chione.Util.unsafeCast;
 
 public class SerializerRegistry implements ChioneSerializer<Object> {
 
     private final Map<String, ChioneSerializer<?>> serializers = new HashMap<>();
+    private final Map<Class<?>, ChioneSerializer<?>> aliases = new HashMap<>();
 
     public SerializerRegistry(Map<String, ChioneSerializer<?>> serializers) {
-        @SuppressWarnings("ArraysAsListWithZeroOrOneArgument")
-        final Class<? extends List> aClass = Arrays.asList().getClass();
-        this.serializers.put(aClass.getName(), new ChioneSerializer<Object>() {
-            @Override
-            public ChioneDescriptor describe(Object obj) {
-                return new ChioneDescriptor(aClass.getName());
-            }
-
-            @SuppressWarnings("ForLoopReplaceableByForEach")
-            @Override
-            public void writeContent(Object obj, ChioneDataOutput dataOutput) {
-                List list = (List) obj;
-                int size = list.size();
-                dataOutput.write(size);
-                for (int i = 0; i < size; i++) {
-                    dataOutput.writeReference(list.get(i));
-                }
-            }
+        register(arrayAsListClass(), new AbstractListSerializer("$Arrays.asList") {
 
             @Override
-            public Object deserialize(DeserializationContext context) {
+            public List<?> deserialize(DeserializationContext context) {
                 int size = context.input().readInt();
                 Object[] result = new Object[size];
                 for (int i = 0; i < size; i++) {
@@ -40,11 +21,35 @@ public class SerializerRegistry implements ChioneSerializer<Object> {
                 }
                 return context.hookCreation(Arrays.asList(result));
             }
+
+            @Override
+            protected List<Object> create(int size) {
+                throw new UnsupportedOperationException();
+            }
+        });
+
+        register(ArrayList.class, new AbstractListSerializer("$ArrayList") {
+            @Override
+            protected List<Object> create(int size) {
+                return new ArrayList<>(size);
+            }
         });
 
         this.serializers.put(Lazy.CLASS_NAME, Lazy.REGISTRY);
 
         this.serializers.putAll(serializers);
+
+        register(String.class, StringSerializer.CLASS_NAME, StringSerializer.INSTANCE);
+        register(ChioneDescriptor.class, ChioneDescriptor.CLASS_NAME, ChioneDescriptor.DESERIALIZER);
+    }
+
+    private void register(Class<?> clazz, AbstractChioneSerializer<?> serializer) {
+        register(clazz, serializer.getClassName(), serializer);
+    }
+
+    private void register(Class<?> clazz, String className, ChioneSerializer<?> serializer) {
+        serializers.put(className, serializer);
+        aliases.put(clazz, serializer);
     }
 
     @Override
@@ -63,7 +68,11 @@ public class SerializerRegistry implements ChioneSerializer<Object> {
     }
 
     private <T> ChioneSerializer<T> getSerializer(Object object) {
-        return getSerializer(getName(object));
+        ChioneSerializer<?> serializer = aliases.get(object.getClass());
+        if (serializer != null) {
+            return unsafeCast(serializer);
+        }
+        return unsafeCast(getSerializer(getName(object)));
     }
 
     private String getName(Object object) {
@@ -75,28 +84,25 @@ public class SerializerRegistry implements ChioneSerializer<Object> {
 
     private <T> ChioneSerializer<T> getSerializer(ChioneDescriptor descriptor) {
         String className = descriptor.getClassName();
-        return getSerializer(className);
+        return unsafeCast(getSerializer(className));
     }
 
-    private  <T> ChioneSerializer<T> getSerializer(String className) {
-        if (className.equals(StringSerializer.CLASS_NAME)) {
-            return unsafeCast(StringSerializer.INSTANCE);
-        }
-
-        if (className.equals(ChioneDescriptor.CLASS_NAME)) {
-            return unsafeCast(ChioneDescriptor.DESERIALIZER);
-        }
-
+    private ChioneSerializer<?> getSerializer(String className) {
         if (className.startsWith("[")) {
-            return unsafeCast(ArraySerializer.INSTANCE);
+            return ArraySerializer.INSTANCE;
         }
 
         ChioneSerializer<?> chioneSerializer = serializers.get(className);
         if (chioneSerializer != null) {
-            return unsafeCast(chioneSerializer);
+            return chioneSerializer;
         }
 
         throw new IllegalArgumentException("No serializer for class " + className);
+    }
+
+    @SuppressWarnings("ArraysAsListWithZeroOrOneArgument")
+    private static Class<?> arrayAsListClass() {
+        return Arrays.asList().getClass();
     }
 
 }

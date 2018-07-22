@@ -186,6 +186,28 @@ class AnnotationProcessorTest {
     }
 
     @Test
+    @Parameters(["Boolean", "Byte", "Short", "Character", "Integer", "Float", "Long", "Double"])
+    void wrapper(String type) {
+        def module = oneFieldModule("java.lang.$type")
+        def factory = module.factory()
+        def chione = module.chione()
+
+        def entry = factory.createEntry()
+
+        def clazz = entry.getClass().getMethod("data").returnType;
+        def original = 90.asType(clazz)
+
+        entry.data(original)
+        chione.save(entry)
+
+        def nextEntry = chione.load()
+
+        assert entry != nextEntry
+        assert entry.data() == nextEntry.data()
+        assert nextEntry.data() == original
+    }
+
+    @Test
     @Parameters(["boolean", "byte", "short", "char", "int", "float", "long", "double", "String", "String[]"])
     void array(String type) {
         def module = oneFieldModule("$type[]")
@@ -310,6 +332,50 @@ class AnnotationProcessorTest {
 
         assert nextEntry.tagToVerify() == "Entry tag"
         assert anotherEntry.tagToVerify() == "Another entry tag"
+    }
+
+    @Test
+    @Parameters(["String", "Integer", "Double"])
+    void arrayList(String type) {
+        def module = oneFieldModule("java.util.ArrayList<$type>")
+        def factory = module.factory()
+        def chione = module.chione()
+
+        def entry = factory.createEntry()
+
+        def name = type.contains("<") ? type.substring(0, type.indexOf("<")) : type;
+        def clazz = Class.forName(name.contains(".") ? name : "java.lang.$name")
+
+        def original = [-100, -1, 0, 1, 2, 3, 4, 5].collect { it.asType(clazz) }
+        entry.data(original)
+        chione.save(entry)
+
+        def nextEntry = chione.load()
+
+        assert entry != nextEntry
+        assert !(entry.data().is(nextEntry.data()))
+        assert entry.data() == nextEntry.data()
+        assert nextEntry.data() == original
+    }
+
+    @Test
+    void arrayListOfArrayList() {
+        def module = oneFieldModule("java.util.ArrayList<java.util.ArrayList<String>>")
+        def factory = module.factory()
+        def chione = module.chione()
+
+        def entry = factory.createEntry()
+
+        def original = [["one", "two"], ["three"]]
+        entry.data(original)
+        chione.save(entry)
+
+        def nextEntry = chione.load()
+
+        assert entry != nextEntry
+        assert !(entry.data().is(nextEntry.data()))
+        assert entry.data() == nextEntry.data()
+        assert nextEntry.data() == original
     }
 
 }
