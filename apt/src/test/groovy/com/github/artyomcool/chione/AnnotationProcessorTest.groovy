@@ -335,7 +335,7 @@ class AnnotationProcessorTest {
     }
 
     @Test
-    @Parameters(["String", "Integer", "Double"])
+    @Parameters(["String", "Object", "Integer", "Double"])
     void arrayList(String type) {
         def module = oneFieldModule("java.util.ArrayList<$type>")
         def factory = module.factory()

@@ -28,6 +28,102 @@ public class SerializerRegistry implements ChioneSerializer<Object> {
             }
         });
 
+        register(Boolean.class, new AbstractWrapperSerializer<Boolean>("$Boolean") {
+            @Override
+            public void writeContent(Boolean obj, ChioneDataOutput dataOutput) {
+                dataOutput.write(obj ? (byte) 1 : (byte) 0);
+            }
+
+            @Override
+            Boolean read(ChioneDataInput input) {
+                return input.readInt() > 0;
+            }
+        });
+
+        register(Byte.class, new AbstractWrapperSerializer<Byte>("$Byte") {
+            @Override
+            public void writeContent(Byte obj, ChioneDataOutput dataOutput) {
+                dataOutput.write(obj);
+            }
+
+            @Override
+            Byte read(ChioneDataInput input) {
+                return input.readByte();
+            }
+        });
+
+        register(Short.class, new AbstractWrapperSerializer<Short>("$Short") {
+            @Override
+            public void writeContent(Short obj, ChioneDataOutput dataOutput) {
+                dataOutput.write(obj);
+            }
+
+            @Override
+            Short read(ChioneDataInput input) {
+                return input.readShort();
+            }
+        });
+
+        register(Character.class, new AbstractWrapperSerializer<Character>("$Character") {
+            @Override
+            public void writeContent(Character obj, ChioneDataOutput dataOutput) {
+                dataOutput.write((short) obj.charValue());
+            }
+
+            @Override
+            Character read(ChioneDataInput input) {
+                return (char) input.readShort();
+            }
+        });
+
+        register(Integer.class, new AbstractWrapperSerializer<Integer>("$Integer") {
+            @Override
+            public void writeContent(Integer obj, ChioneDataOutput dataOutput) {
+                dataOutput.write(obj);
+            }
+
+            @Override
+            Integer read(ChioneDataInput input) {
+                return input.readInt();
+            }
+        });
+
+        register(Long.class, new AbstractWrapperSerializer<Long>("$Long") {
+            @Override
+            public void writeContent(Long obj, ChioneDataOutput dataOutput) {
+                dataOutput.write(obj);
+            }
+
+            @Override
+            Long read(ChioneDataInput input) {
+                return input.readLong();
+            }
+        });
+
+        register(Float.class, new AbstractWrapperSerializer<Float>("$Float") {
+            @Override
+            public void writeContent(Float obj, ChioneDataOutput dataOutput) {
+                dataOutput.write(Float.floatToRawIntBits(obj));
+            }
+
+            @Override
+            Float read(ChioneDataInput input) {
+                return Float.intBitsToFloat(input.readInt());
+            }
+        });
+
+        register(Double.class, new AbstractWrapperSerializer<Double>("$Double") {
+            @Override
+            public void writeContent(Double obj, ChioneDataOutput dataOutput) {
+                dataOutput.write(Double.doubleToRawLongBits(obj));
+            }
+
+            @Override
+            Double read(ChioneDataInput input) {
+                return Double.longBitsToDouble(input.readLong());
+            }
+        });
+
         register(ArrayList.class, new AbstractListSerializer("$ArrayList") {
             @Override
             protected List<Object> create(int size) {
