@@ -337,20 +337,14 @@ class AnnotationProcessorTest {
         assert anotherEntry.tagToVerify() == "Another entry tag"
     }
 
-    @Test
-    @Parameters(["String", "Object", "Integer", "Double"])
-    void arrayList(String type) {
-        def module = oneFieldModule("java.util.ArrayList<$type>")
+    private void testCollection(String type, def originalData) {
+        def module = oneFieldModule(type)
         def factory = module.factory()
         def chione = module.chione()
 
         def entry = factory.createEntry()
 
-        def name = type.contains("<") ? type.substring(0, type.indexOf("<")) : type;
-        def clazz = Class.forName(name.contains(".") ? name : "java.lang.$name")
-
-        def original = [-100, -1, 0, 1, 2, 3, 4, 5].collect { it.asType(clazz) }
-        entry.data(original)
+        entry.data(originalData)
         chione.save(entry)
 
         def nextEntry = chione.load()
@@ -358,27 +352,23 @@ class AnnotationProcessorTest {
         assert entry != nextEntry
         assert !(entry.data().is(nextEntry.data()))
         assert entry.data() == nextEntry.data()
-        assert nextEntry.data() == original
+        assert nextEntry.data() == originalData
+    }
+
+    @Test
+    @Parameters(["String", "Object", "Integer", "Double"])
+    void arrayList(String type) {
+        def clazz = Class.forName("java.lang.$type")
+
+        def original = [-100, -1, 0, 1, 2, 3, 4, 5].collect { it.asType(clazz) }
+
+        testCollection("java.util.ArrayList<$type>", original)
     }
 
     @Test
     void arrayListOfArrayList() {
-        def module = oneFieldModule("java.util.ArrayList<java.util.ArrayList<String>>")
-        def factory = module.factory()
-        def chione = module.chione()
-
-        def entry = factory.createEntry()
-
         def original = [["one", "two"], ["three"]]
-        entry.data(original)
-        chione.save(entry)
-
-        def nextEntry = chione.load()
-
-        assert entry != nextEntry
-        assert !(entry.data().is(nextEntry.data()))
-        assert entry.data() == nextEntry.data()
-        assert nextEntry.data() == original
+        testCollection("java.util.ArrayList<java.util.ArrayList<String>>", original)
     }
 
     @Test
@@ -403,6 +393,36 @@ class AnnotationProcessorTest {
         assert nextData[0] == "First tag"
         assert nextData[1] == nextData
         assert nextData[2] == "Last tag"
+    }
+
+    @Test
+    @Parameters(["String", "Object", "Integer", "Double"])
+    void linkedList(String type) {
+        def clazz = Class.forName("java.lang.$type")
+
+        def original = [-100, -1, 0, 1, 2, 3, 4, 5].collect { it.asType(clazz) } as LinkedList
+
+        testCollection("java.util.LinkedList<$type>", original)
+    }
+
+    @Test
+    @Parameters(["String", "Object", "Integer", "Double"])
+    void hashSet(String type) {
+        def clazz = Class.forName("java.lang.$type")
+
+        def original = [-100, -1, 0, 1, 2, 3, 4, 5].collect { it.asType(clazz) } as HashSet
+
+        testCollection("java.util.HashSet<$type>", original)
+    }
+
+    @Test
+    @Parameters(["String", "Object", "Integer", "Double"])
+    void linkedHashSet(String type) {
+        def clazz = Class.forName("java.lang.$type")
+
+        def original = [-100, -1, 0, 1, 2, 3, 4, 5].collect { it.asType(clazz) } as LinkedHashSet
+
+        testCollection("java.util.LinkedHashSet<$type>", original)
     }
 
     @Test

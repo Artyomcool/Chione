@@ -1,6 +1,7 @@
 package com.github.artyomcool.chione;
 
 import java.util.*;
+import java.util.concurrent.LinkedBlockingDeque;
 
 import static com.github.artyomcool.chione.Util.unsafeCast;
 
@@ -10,10 +11,10 @@ public class SerializerRegistry implements ChioneSerializer<Object> {
     private final Map<Class<?>, ChioneSerializer<?>> aliases = new HashMap<>();
 
     public SerializerRegistry(Map<String, ChioneSerializer<?>> serializers) {
-        register(arrayAsListClass(), new AbstractListSerializer("$Arrays.asList") {
+        register(arrayAsListClass(), new AbstractCollectionSerializer<List<Object>>("$Arrays.asList") {
 
             @Override
-            public List<?> deserialize(DeserializationContext context) {
+            public List<Object> deserialize(DeserializationContext context) {
                 int size = context.input().readInt();
                 Object[] result = new Object[size];
                 for (int i = 0; i < size; i++) {
@@ -124,10 +125,38 @@ public class SerializerRegistry implements ChioneSerializer<Object> {
             }
         });
 
-        register(ArrayList.class, new AbstractListSerializer("$ArrayList") {
+        register(ArrayList.class, new AbstractCollectionSerializer<ArrayList<Object>>("$ArrayList") {
             @Override
-            protected List<Object> create(int size) {
+            protected ArrayList<Object> create(int size) {
                 return new ArrayList<>(size);
+            }
+        });
+
+        register(LinkedList.class, new AbstractCollectionSerializer<LinkedList<Object>>("$LinkedList") {
+            @Override
+            protected LinkedList<Object> create(int size) {
+                return new LinkedList<>();
+            }
+        });
+
+        register(HashSet.class, new AbstractCollectionSerializer<HashSet<Object>>("$HashSet") {
+            @Override
+            protected HashSet<Object> create(int size) {
+                return new HashSet<>();
+            }
+        });
+
+        register(LinkedHashSet.class, new AbstractCollectionSerializer<LinkedHashSet<Object>>("$LinkedHashSet") {
+            @Override
+            protected LinkedHashSet<Object> create(int size) {
+                return new LinkedHashSet<>();
+            }
+        });
+
+        register(ArrayDeque.class, new AbstractCollectionSerializer<ArrayDeque<Object>>("$LinkedHashSet") {
+            @Override
+            protected ArrayDeque<Object> create(int size) {
+                return new ArrayDeque<>(size);
             }
         });
 
