@@ -384,14 +384,14 @@ class AnnotationProcessorTest {
     void arrayList(String type) {
         def clazz = Class.forName("java.lang.$type")
 
-        def original = [-100, -1, 0, 1, 2, 3, 4, 5].collect { it.asType(clazz) }
+        def original = [-100, -1, 0, 1, 2, 3, 4, 5].collect { it.asType(clazz) } as ArrayList
 
         testCollection("java.util.ArrayList<$type>", original)
     }
 
     @Test
     void arrayListOfArrayList() {
-        def original = [["one", "two"], ["three"]]
+        def original = [["one", "two"], ["three"]] as ArrayList
         testCollection("java.util.ArrayList<java.util.ArrayList<String>>", original)
     }
 
@@ -447,6 +447,46 @@ class AnnotationProcessorTest {
         def original = [-100, -1, 0, 1, 2, 3, 4, 5].collect { it.asType(clazz) } as LinkedHashSet
 
         testCollection("java.util.LinkedHashSet<$type>", original)
+    }
+
+    @Test
+    @Parameters(["String", "Object", "Integer", "Double"])
+    void hashMapKey(String type) {
+        def clazz = Class.forName("java.lang.$type")
+
+        def original = new HashMap([-100, -1, 0, 1, 2, 3, 4, 5].collectEntries { [(it.asType(clazz)) : it] })
+
+        testCollection("java.util.HashMap<$type, Integer>", original)
+    }
+
+    @Test
+    @Parameters(["String", "Object", "Integer", "Double"])
+    void hashMapValue(String type) {
+        def clazz = Class.forName("java.lang.$type")
+
+        def original = new HashMap([-100, -1, 0, 1, 2, 3, 4, 5].collectEntries { [(it) : it.asType(clazz)] })
+
+        testCollection("java.util.HashMap<Integer, $type>", original)
+    }
+
+    @Test
+    @Parameters(["String", "Object", "Integer", "Double"])
+    void linkedHashMapKey(String type) {
+        def clazz = Class.forName("java.lang.$type")
+
+        def original = new LinkedHashMap([-100, -1, 0, 1, 2, 3, 4, 5].collectEntries { [(it.asType(clazz)) : it] })
+
+        testCollection("java.util.LinkedHashMap<$type, Integer>", original)
+    }
+
+    @Test
+    @Parameters(["String", "Object", "Integer", "Double"])
+    void linkedHashMapValue(String type) {
+        def clazz = Class.forName("java.lang.$type")
+
+        def original = new LinkedHashMap([-100, -1, 0, 1, 2, 3, 4, 5].collectEntries { [(it) : it.asType(clazz)] })
+
+        testCollection("java.util.LinkedHashMap<Integer, $type>", original)
     }
 
     @Test

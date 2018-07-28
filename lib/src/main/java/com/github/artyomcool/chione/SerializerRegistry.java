@@ -170,6 +170,13 @@ public class SerializerRegistry implements ChioneSerializer<Object> {
             }
         });
 
+        register(TreeSet.class, new AbstractCollectionSerializer<TreeSet<Object>>("$TreeSet") {
+            @Override
+            protected TreeSet<Object> create(int size) {
+                return new TreeSet<>();
+            }
+        });
+
         register(LinkedHashSet.class, new AbstractCollectionSerializer<LinkedHashSet<Object>>("$LinkedHashSet") {
             @Override
             protected LinkedHashSet<Object> create(int size) {
@@ -177,10 +184,24 @@ public class SerializerRegistry implements ChioneSerializer<Object> {
             }
         });
 
-        register(ArrayDeque.class, new AbstractCollectionSerializer<ArrayDeque<Object>>("$LinkedHashSet") {
+        register(ArrayDeque.class, new AbstractCollectionSerializer<ArrayDeque<Object>>("$ArrayDeque") {
             @Override
             protected ArrayDeque<Object> create(int size) {
                 return new ArrayDeque<>(size);
+            }
+        });
+
+        register(HashMap.class, new AbstractMapSerializer<HashMap<Object, Object>>("$HashMap") {
+            @Override
+            protected HashMap<Object, Object> create(int size) {
+                return new HashMap<>();
+            }
+        });
+
+        register(LinkedHashMap.class, new AbstractMapSerializer<LinkedHashMap<Object, Object>>("$LinkedHashMap") {
+            @Override
+            protected LinkedHashMap<Object, Object> create(int size) {
+                return new LinkedHashMap<>();
             }
         });
 
