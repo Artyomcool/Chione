@@ -24,16 +24,19 @@
 
 package com.github.artyomcool.chione;
 
+import java.util.Arrays;
+
+//TODO tests
 public class ArrayMap<K, V> {
 
     private Object[] storage = new Object[8];
-    private int count = 0;
+    private int doubleCount = 0;
 
     public V get(K key) {
-        for (int i = 0; i < count; i++) {
+        for (int i = 0; i < doubleCount; i += 2) {
             if (key.equals(storage[i])) {
                 @SuppressWarnings("unchecked")
-                V result = (V) storage[storage.length / 2 + i];
+                V result = (V) storage[i + 1];
                 return result;
             }
         }
@@ -41,9 +44,25 @@ public class ArrayMap<K, V> {
     }
 
     public void put(K key, V value) {
-        int valuePos = count * 2;
-        storage[valuePos] = value;
-        storage[count++] = key;
+        if (doubleCount >= storage.length) {
+            storage = Arrays.copyOf(storage, storage.length * 2);
+        }
+        storage[doubleCount++] = key;
+        storage[doubleCount++] = value;
+    }
+
+    public int size() {
+        return doubleCount / 2;
+    }
+
+    @SuppressWarnings("unchecked")
+    public K keyAt(int index) {
+        return (K) storage[index * 2];
+    }
+
+    @SuppressWarnings("unchecked")
+    public V valueAt(int index) {
+        return (V) storage[index * 2 + 1];
     }
 
 }

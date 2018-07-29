@@ -25,7 +25,6 @@
 package com.github.artyomcool.chione;
 
 import java.util.*;
-import java.util.concurrent.LinkedBlockingDeque;
 
 import static com.github.artyomcool.chione.Util.unsafeCast;
 
@@ -33,6 +32,7 @@ public class SerializerRegistry implements ChioneSerializer<Object> {
 
     private final Map<String, ChioneSerializer<?>> serializers = new HashMap<>();
     private final Map<Class<?>, ChioneSerializer<?>> aliases = new HashMap<>();
+    private final ArrayMap<Class<?>, ChioneSerializer<?>> hierarchy = new ArrayMap<>();
 
     public SerializerRegistry(Map<String, ChioneSerializer<?>> serializers) {
         register(arrayAsListClass(), new AbstractCollectionSerializer<List<Object>>("$Arrays.asList") {
@@ -207,6 +207,11 @@ public class SerializerRegistry implements ChioneSerializer<Object> {
 
         register(Lazy.class, Lazy.CLASS_NAME, Lazy.REGISTRY);
 
+        registerHierarchy(List.class, this.aliases.get(ArrayList.class));
+        registerHierarchy(Set.class, this.aliases.get(HashSet.class));
+        registerHierarchy(Map.class, this.aliases.get(HashMap.class));
+        registerHierarchy(Queue.class, this.aliases.get(ArrayDeque.class));
+
         this.serializers.putAll(serializers);
 
         register(String.class, StringSerializer.CLASS_NAME, StringSerializer.INSTANCE);
@@ -220,6 +225,10 @@ public class SerializerRegistry implements ChioneSerializer<Object> {
     private void register(Class<?> clazz, String className, ChioneSerializer<?> serializer) {
         serializers.put(className, serializer);
         aliases.put(clazz, serializer);
+    }
+
+    private void registerHierarchy(Class<?> clazz, ChioneSerializer<?> serializer) {
+        hierarchy.put(clazz, serializer);
     }
 
     @Override
@@ -238,11 +247,22 @@ public class SerializerRegistry implements ChioneSerializer<Object> {
     }
 
     private <T> ChioneSerializer<T> getSerializer(Object object) {
-        ChioneSerializer<?> serializer = aliases.get(object.getClass());
+        Class<?> objectClass = object.getClass();
+        ChioneSerializer<?> serializer = aliases.get(objectClass);
         if (serializer != null) {
             return unsafeCast(serializer);
         }
-        return unsafeCast(getSerializer(getName(object)));
+        serializer = getSerializer(getName(object));
+        if (serializer != null) {
+            return unsafeCast(serializer);
+        }
+        for (int i = 0; i < hierarchy.size(); i++) {
+            Class<?> clazz = hierarchy.keyAt(i);
+            if (clazz.isAssignableFrom(objectClass)) {
+                return unsafeCast(hierarchy.valueAt(i));
+            }
+        }
+        throw new IllegalArgumentException("No serializer for object " + object);
     }
 
     private String getName(Object object) {
@@ -254,7 +274,11 @@ public class SerializerRegistry implements ChioneSerializer<Object> {
 
     private <T> ChioneSerializer<T> getSerializer(ChioneDescriptor descriptor) {
         String className = descriptor.getClassName();
-        return unsafeCast(getSerializer(className));
+        ChioneSerializer<?> serializer = getSerializer(className);
+        if (serializer == null) {
+            throw new ChioneException("No serializer for class " + className);
+        }
+        return unsafeCast(serializer);
     }
 
     private ChioneSerializer<?> getSerializer(String className) {
@@ -267,7 +291,7 @@ public class SerializerRegistry implements ChioneSerializer<Object> {
             return chioneSerializer;
         }
 
-        throw new IllegalArgumentException("No serializer for class " + className);
+        return null;
     }
 
     @SuppressWarnings("ArraysAsListWithZeroOrOneArgument")

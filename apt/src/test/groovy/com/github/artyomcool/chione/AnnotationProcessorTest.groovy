@@ -490,6 +490,42 @@ class AnnotationProcessorTest {
     }
 
     @Test
+    void listHierarchy() {
+        def original = new LinkedList([-100, -1, 0, 1, 2, 3, 4, 5]) {
+            @Override
+            String toString() {
+                return "just for fun"
+            }
+        }
+
+        testCollection("java.util.List<Integer>", original)
+    }
+
+    @Test
+    void setHierarchy() {
+        def original = new TreeSet([-100, -1, 0, 1, 2, 3, 4, 5]) {
+            @Override
+            String toString() {
+                return "just for fun"
+            }
+        }
+
+        testCollection("java.util.Set<Integer>", original)
+    }
+
+    @Test
+    void mapHierarchy() {
+        def original = new HashMap([-100, -1, 0, 1, 2, 3, 4, 5].collectEntries { [(it) : it.toString()] }) {
+            @Override
+            String toString() {
+                return "just for fun"
+            }
+        }
+
+        testCollection("java.util.Map<Integer, String>", original)
+    }
+
+    @Test
     void lazy() {
         def module = oneFieldModule("com.github.artyomcool.chione.Lazy<String>")
         def factory = module.factory()
