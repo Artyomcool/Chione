@@ -26,6 +26,7 @@ package com.github.artyomcool.chione
 
 import com.github.javaparser.JavaParser
 import com.google.testing.compile.Compilation
+import com.google.testing.compile.CompilationSubject
 import com.google.testing.compile.Compiler
 import com.google.testing.compile.JavaFileObjects
 import junitparams.JUnitParamsRunner
@@ -38,9 +39,31 @@ import javax.tools.StandardLocation
 @RunWith(JUnitParamsRunner)
 class AnnotationProcessorTest {
 
+    private static String unindent(String code) {
+        int indent = -1
+        StringBuilder builder = new StringBuilder();
+        code.eachLine {
+            if (indent == -1) {
+                if (!it.isAllWhitespace()) {
+                    indent = it.length() - it.trim().length()
+                    builder.append(it.substring(indent)).append("\n");
+                }
+            } else {
+                if (it.isAllWhitespace()) {
+                    builder.append("\n")
+                } else {
+                    builder.append(it.substring(indent)).append("\n");
+                }
+            }
+        }
+
+        return builder.toString()
+    }
+
     private ClassLoader generate(String... sources) {
 
         def objects = sources.collect { String code ->
+            code = unindent(code)
             def unit = JavaParser.parse(code)
             def packageName = unit.packageDeclaration.get()?.name?.toString()
             def className = unit.getType(0).name.toString()
@@ -53,22 +76,18 @@ class AnnotationProcessorTest {
                 .withProcessors(new AnnotationProcessor())
                 .compile(objects)
 
-        compilation.diagnostics().forEach({println it.getMessage(null)})
+        CompilationSubject.assertThat(compilation).succeeded()
 
-        if (compilation.status() == Compilation.Status.SUCCESS) {
-            return new ClassLoader(getClass().getClassLoader()) {
-                @Override
-                Class<?> findClass(String name) throws ClassNotFoundException {
-                    def className = name.replace(".", "/") + ".class"
-                    def file = compilation.generatedFile(StandardLocation.CLASS_OUTPUT, className)
-                            .orElseThrow({ new ClassNotFoundException("Class not found: " + name) })
-                    def bytes = file.openInputStream().bytes
-                    return defineClass(name, bytes, 0, bytes.length)
-                }
+        return new ClassLoader(getClass().getClassLoader()) {
+            @Override
+            Class<?> findClass(String name) throws ClassNotFoundException {
+                def className = name.replace(".", "/") + ".class"
+                def file = compilation.generatedFile(StandardLocation.CLASS_OUTPUT, className)
+                        .orElseThrow({ new ClassNotFoundException("Class not found: " + name) })
+                def bytes = file.openInputStream().bytes
+                return defineClass(name, bytes, 0, bytes.length)
             }
         }
-
-        throw new IllegalStateException("Compilation error")
     }
 
     ChioneModule<?, ?> generateModule(String name, String... sources) {
@@ -79,24 +98,7 @@ class AnnotationProcessorTest {
         return generate(sources).loadClass(name).newInstance(dataFile) as ChioneModule<?, ?>
     }
 
-    ChioneModule<?, ?> oneFieldModule(String type) {
-        def someEntryClass =
-                """
-                    package test;
-
-                    import com.github.artyomcool.chione.Ice;
-                    
-                    @Ice
-                    public interface SomeEntry {
-                        
-                        $type data();
-                        
-                        void data($type t);
-                        
-                    }
-
-                """
-
+    ChioneModule<?, ?> oneEntryModule(String entry) {
         def factoryClass =
                 """
                     package test;
@@ -111,7 +113,25 @@ class AnnotationProcessorTest {
                     }
                 """
 
-        return generateModule("test.SomeFactoryModule", someEntryClass, factoryClass)
+        return generateModule("test.SomeFactoryModule", entry, factoryClass)
+    }
+
+    ChioneModule<?, ?> oneFieldModule(String type) {
+        oneEntryModule """
+                    package test;
+
+                    import com.github.artyomcool.chione.Ice;
+                    
+                    @Ice
+                    public interface SomeEntry {
+                        
+                        $type data();
+                        
+                        void data($type t);
+                        
+                    }
+
+                """
     }
 
     @Test
@@ -473,24 +493,6 @@ class AnnotationProcessorTest {
     }
 
     @Test
-    void lazy() {
-        def module = oneFieldModule("com.github.artyomcool.chione.Lazy<String>")
-        def factory = module.factory()
-        def chione = module.chione()
-
-        def entry = factory.createEntry()
-        entry.data(new Lazy<>("Hey!"))
-
-        chione.save(entry)
-
-        def nextEntry = chione.load()
-
-        assert !nextEntry.data().isLoaded()
-        assert nextEntry.data().get() == "Hey!"
-        assert nextEntry.data().isLoaded()
-    }
-
-    @Test
     void fieldRemoval() {
         def fullData =
                 """
@@ -653,6 +655,85 @@ class AnnotationProcessorTest {
         assert nextEntry.field1() == "f1"
         assert nextEntry.field2() == null
         assert nextEntry.field3() == "f3"
+    }
+
+    @Test
+    void lazy() {
+        def module = oneFieldModule("com.github.artyomcool.chione.Lazy<String>")
+        def factory = module.factory()
+        def chione = module.chione()
+
+        def entry = factory.createEntry()
+        entry.data(new Lazy<>("Hey!"))
+
+        chione.save(entry)
+
+        def nextEntry = chione.load()
+
+        assert !nextEntry.data().isLoaded()
+        assert nextEntry.data().get() == "Hey!"
+        assert nextEntry.data().isLoaded()
+    }
+
+    @Test
+    @Parameters([
+            "boolean",
+            "byte",
+            "short",
+            "char",
+            "int",
+            "float",
+            "long",
+            "double",
+            "String",
+            "String[]",
+            "Boolean",
+            "Integer"
+    ])
+
+    void simpleLazyAnnotatedField(def type) {
+        def module = oneEntryModule """
+                    package test;
+
+                    import com.github.artyomcool.chione.Fetch;
+                    import com.github.artyomcool.chione.Ice;
+                    
+                    @Ice
+                    public interface SomeEntry {
+                        
+                        @Fetch(Fetch.Type.LAZY) 
+                        $type data();
+                        
+                        void data($type t);
+                        
+                    }
+
+                """
+
+        def factory = module.factory()
+        def chione = module.chione()
+
+        def entry = factory.createEntry()
+        def clazz = entry.getClass().getMethod("data").returnType;
+        def original = 90.asType(clazz)
+
+        entry.data(original)
+
+        chione.save(entry)
+
+        def nextEntry = chione.load()
+
+        assert nextEntry.data() == original
+    }
+
+    @Test
+    void lazyAnnotatedClass() {
+
+    }
+
+    @Test
+    void eagerAnnotatedFieldLazyClass() {
+
     }
 
 }

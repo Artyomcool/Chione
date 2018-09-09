@@ -64,6 +64,10 @@ public class Lazy<T> {
         return unsafeCast(lazy);
     }
 
+    public void set(T data) {
+        lazy = data;
+    }
+
     boolean isLoaded() {
         return !(lazy instanceof LazyData);
     }

@@ -60,22 +60,25 @@ class IceProcessor extends Processor<Ice> {
         List<MethodDescriptor> methods = FieldAnalyzer.analyze(element);
 
         for (MethodDescriptor descriptor : methods) {
-            TypeName typeName = TypeName.get(descriptor.getter().getReturnType());
-            typeSpecBuilder.addField(typeName, descriptor.name(), PRIVATE);
+            FieldSpec.Builder builder = FieldSpec.builder(descriptor.type(), descriptor.name(), PRIVATE);
+            CodeBlock initializer = descriptor.fieldInitializer();
+            if (initializer != null) {
+                builder.initializer(initializer);
+            }
+            typeSpecBuilder.addField(builder.build());
         }
 
         for (MethodDescriptor descriptor : methods) {
             MethodSpec getterSpec = MethodSpec.overriding(descriptor.getter())
-                    .addStatement("return this.$L", descriptor.name())
+                    .addStatement(getterBody(descriptor))
                     .build();
 
             typeSpecBuilder.addMethod(getterSpec);
 
             ExecutableElement setter = descriptor.setter();
-            String firstParamName = setter.getParameters().get(0).getSimpleName().toString();
 
             MethodSpec.Builder methodSpecBuilder = MethodSpec.overriding(setter)
-                    .addStatement("this.$L = $L", descriptor.name(), firstParamName);
+                    .addStatement(setterBody(descriptor));
 
             if (setter.getReturnType().getKind() != TypeKind.VOID) {
                 methodSpecBuilder.addStatement("return this");
@@ -153,7 +156,7 @@ class IceProcessor extends Processor<Ice> {
                         "new $T($S, $S)",
                         SnowFlakeField.class,
                         descriptor.name(),
-                        descriptor.getter().getReturnType().toString()
+                        descriptor.type().toString()
                 )
                 .build();
     }
@@ -182,31 +185,26 @@ class IceProcessor extends Processor<Ice> {
     private CodeBlock writeCode(List<MethodDescriptor> descriptors) {
         CodeBlock.Builder builder = CodeBlock.builder();
         for (MethodDescriptor descriptor : descriptors) {
-            switch (descriptor.getter().getReturnType().getKind()) {
-                case ARRAY:
-                case DECLARED:
-                    builder.addStatement("output.writeReference(this.$L)", descriptor.name());
-                    break;
-                case BOOLEAN:
+            TypeName type = descriptor.type();
+            if (!type.isPrimitive()) {
+                builder.addStatement("output.writeReference(this.$L)", descriptor.name());
+            } else {
+                if (type == TypeName.BOOLEAN) {
                     builder.addStatement("output.write(this.$L ? (byte) 1 : (byte) 0)", descriptor.name());
-                    break;
-                case CHAR:
+                } else if (type == TypeName.CHAR) {
                     builder.addStatement("output.write((short) this.$L)", descriptor.name());
-                    break;
-                case FLOAT:
-                    builder.addStatement("output.write(Float.floatToRawIntBits(this.$L))", descriptor.name());
-                    break;
-                case DOUBLE:
-                    builder.addStatement("output.write(Double.doubleToRawLongBits(this.$L))", descriptor.name());
-                    break;
-                case BYTE:
-                case SHORT:
-                case INT:
-                case LONG:
+                } else if (type == TypeName.BYTE
+                        || type == TypeName.SHORT
+                        || type == TypeName.INT
+                        || type == TypeName.LONG) {
                     builder.addStatement("output.write(this.$L)", descriptor.name());
-                    break;
-                default:
-                    throw new IllegalArgumentException("Unsupported type: " + descriptor.getter().getReturnType());
+                } else if (type == TypeName.FLOAT) {
+                    builder.addStatement("output.write(Float.floatToRawIntBits(this.$L))", descriptor.name());
+                } else if (type == TypeName.DOUBLE) {
+                    builder.addStatement("output.write(Double.doubleToRawLongBits(this.$L))", descriptor.name());
+                } else {
+                    throw new AssertionError();
+                }
             }
         }
         return builder.build();
@@ -222,41 +220,43 @@ class IceProcessor extends Processor<Ice> {
                 builder.addStatement("current = skip(input, steps, current)");
                 builder.beginControlFlow("if (hasCurrentField(steps, current))");
             }
-            switch (descriptor.getter().getReturnType().getKind()) {
-                case ARRAY:
-                case DECLARED:
-                    builder.addStatement("this.$L = input.readReference()", descriptor.name());
-                    break;
-                case BOOLEAN:
+            TypeName type = descriptor.type();
+            if (!type.isPrimitive()) {
+                builder.addStatement("this.$L = input.readReference()", descriptor.name());
+            } else {
+                if (type == TypeName.BOOLEAN) {
                     builder.addStatement("this.$L = input.readByte() > 0", descriptor.name());
-                    break;
-                case BYTE:
+                } else if (type == TypeName.BYTE) {
                     builder.addStatement("this.$L = input.readByte()", descriptor.name());
-                    break;
-                case SHORT:
+                } else if (type == TypeName.SHORT) {
                     builder.addStatement("this.$L = input.readShort()", descriptor.name());
-                    break;
-                case CHAR:
+                } else if (type == TypeName.CHAR) {
                     builder.addStatement("this.$L = (char) input.readShort()", descriptor.name());
-                    break;
-                case INT:
+                } else if (type == TypeName.INT) {
                     builder.addStatement("this.$L = input.readInt()", descriptor.name());
-                    break;
-                case LONG:
+                } else if (type == TypeName.LONG) {
                     builder.addStatement("this.$L = input.readLong()", descriptor.name());
-                    break;
-                case FLOAT:
+                } else if (type == TypeName.FLOAT) {
                     builder.addStatement("this.$L = Float.intBitsToFloat(input.readInt())", descriptor.name());
-                    break;
-                case DOUBLE:
+                } else if (type == TypeName.DOUBLE) {
                     builder.addStatement("this.$L = Double.longBitsToDouble(input.readLong())", descriptor.name());
-                    break;
+                } else {
+                    throw new AssertionError();
+                }
             }
             if (withSteps) {
                 builder.endControlFlow();
             }
         }
         return builder.build();
+    }
+
+    private CodeBlock getterBody(MethodDescriptor descriptor) {
+        return descriptor.fieldAccessor();
+    }
+
+    private CodeBlock setterBody(MethodDescriptor descriptor) {
+        return descriptor.fieldMutator();
     }
 
 }
