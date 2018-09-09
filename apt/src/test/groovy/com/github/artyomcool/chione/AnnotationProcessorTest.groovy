@@ -671,7 +671,9 @@ class AnnotationProcessorTest {
         def nextEntry = chione.load()
 
         assert !nextEntry.data().isLoaded()
+        assert nextEntry.data().lazy != "Hey!"
         assert nextEntry.data().get() == "Hey!"
+        assert nextEntry.data().lazy == "Hey!"
         assert nextEntry.data().isLoaded()
     }
 
@@ -690,7 +692,6 @@ class AnnotationProcessorTest {
             "Boolean",
             "Integer"
     ])
-
     void simpleLazyAnnotatedField(def type) {
         def module = oneEntryModule """
                     package test;
@@ -710,6 +711,89 @@ class AnnotationProcessorTest {
 
                 """
 
+        testLazy(module)
+    }
+
+    @Test
+    @Parameters([
+            "String",
+            "String[]",
+            "Boolean",
+            "Integer"
+    ])
+    void lazyAnnotatedClass(def type) {
+        def module = oneEntryModule """
+                    package test;
+
+                    import com.github.artyomcool.chione.Fetch;
+                    import com.github.artyomcool.chione.Ice;
+                    
+                    @Fetch(Fetch.Type.LAZY) 
+                    @Ice
+                    public interface SomeEntry {
+                       
+                        $type data();
+                        
+                        void data($type t);
+                        
+                    }
+
+                """
+        testLazy(module)
+    }
+
+    @Test
+    @Parameters([
+            "boolean",
+            "byte",
+            "short",
+            "char",
+            "int",
+            "float",
+            "long",
+            "double"
+    ])
+    void lazyAnnotatedClassWithPrimitives(def type) {
+        def module = oneEntryModule """
+                    package test;
+
+                    import com.github.artyomcool.chione.Fetch;
+                    import com.github.artyomcool.chione.Ice;
+                    
+                    @Fetch(Fetch.Type.LAZY) 
+                    @Ice
+                    public interface SomeEntry {
+                       
+                        $type data();
+                        
+                        void data($type t);
+                        
+                    }
+
+                """
+
+        def factory = module.factory()
+        def chione = module.chione()
+
+        def entry = factory.createEntry()
+        def clazz = entry.getClass().getMethod("data").returnType;
+        def fieldType = entry.getClass().getDeclaredField("data").type
+
+        assert fieldType == clazz
+
+        def original = 90.asType(clazz)
+
+        entry.data(original)
+
+        chione.save(entry)
+
+        def nextEntry = chione.load()
+
+        assert nextEntry.data == original
+    }
+
+    private static void testLazy(ChioneModule<?, ?> module) {
+
         def factory = module.factory()
         def chione = module.chione()
 
@@ -723,17 +807,12 @@ class AnnotationProcessorTest {
 
         def nextEntry = chione.load()
 
+        assert nextEntry.data instanceof Lazy
+        assert nextEntry.data.lazy != original
+        assert !nextEntry.data.isLoaded()
         assert nextEntry.data() == original
-    }
-
-    @Test
-    void lazyAnnotatedClass() {
-
-    }
-
-    @Test
-    void eagerAnnotatedFieldLazyClass() {
-
+        assert nextEntry.data.lazy == original
+        assert nextEntry.data.isLoaded()
     }
 
 }
