@@ -43,40 +43,51 @@ class FieldAnalyzer {
     }
 
     static List<MethodDescriptor> analyze(TypeElement element) {
+        return analyze(element, element);
+    }
+
+    static List<MethodDescriptor> analyze(TypeElement forGetters, TypeElement forSetters) {
         FieldAnalyzer analyzer = new FieldAnalyzer();
-        analyzer.collect(element);
+        analyzer.collect(forGetters, forSetters);
         analyzer.sameNameStep();
         analyzer.beanStyleStep();
+        analyzer.gettersOnlyStep();
         analyzer.verifyNothingLeftStep();
         return analyzer.methods;
     }
 
-    private void collect(TypeElement element) {
-        VoidVisitor visitor = new VoidVisitor() {
+    private void collect(TypeElement forGetters, TypeElement forSetters) {
+        VoidVisitor getterVisitor = new VoidVisitor() {
             @Override
             protected void visitExecutable(ExecutableElement e) {
                 if (e.isDefault()) {
                     return;
                 }
 
-                switch (e.getParameters().size()) {
-                    case 0:
-                        //TODO getterVerifyVisitor.visit(e);
-                        getters.put(e.getSimpleName().toString(), e);
-                        return;
-
-                    case 1:
-                        //TODO settersVerifyVisitor.visit(e);
-                        setters.put(e.getSimpleName().toString(), e);
-                        return;
+                if (e.getParameters().size() == 0) {
+                    getters.put(e.getSimpleName().toString(), e);
+                }
+            }
+        };
+        VoidVisitor setterVisitor = new VoidVisitor() {
+            @Override
+            protected void visitExecutable(ExecutableElement e) {
+                if (e.isDefault()) {
+                    return;
                 }
 
-                throw new IllegalArgumentException("Unsupported method type (getter or setter expected): " + e);
+                if (e.getParameters().size() == 1) {
+                    setters.put(e.getSimpleName().toString(), e);
+                }
             }
         };
 
-        for (Element enclosed : element.getEnclosedElements()) {
-            visitor.visit(enclosed);
+        for (Element enclosed : forGetters.getEnclosedElements()) {
+            getterVisitor.visit(enclosed);
+        }
+
+        for (Element enclosed : forSetters.getEnclosedElements()) {
+            setterVisitor.visit(enclosed);
         }
     }
 
@@ -131,11 +142,18 @@ class FieldAnalyzer {
             if (nextGetter != null) {
                 String name = Character.toLowerCase(firstLetter) + fieldNameCapitalized.substring(1);
 
-                MethodDescriptor relatedMethods = new MethodDescriptor(name, nextSetter, nextSetter);
+                MethodDescriptor relatedMethods = new MethodDescriptor(name, nextGetter, nextSetter);
                 methods.add(relatedMethods);
                 iterator.remove();
             }
         }
+    }
+
+    private void gettersOnlyStep() {
+        for (Map.Entry<String, ExecutableElement> entry : getters.entrySet()) {
+            methods.add(new MethodDescriptor(entry.getKey(), entry.getValue(), null));
+        }
+        getters.clear();
     }
 
     private void verifyNothingLeftStep() {

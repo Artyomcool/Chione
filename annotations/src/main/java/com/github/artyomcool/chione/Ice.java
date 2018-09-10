@@ -33,4 +33,11 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME) //TODO will it be useful for some runtime behaviour?
 public @interface Ice {
+
+    @SuppressWarnings("WeakerAccess")
+    @Target(ElementType.TYPE)
+    @Retention(RetentionPolicy.RUNTIME) //TODO will it be useful for some runtime behaviour?
+    @interface Builder {
+    }
+
 }

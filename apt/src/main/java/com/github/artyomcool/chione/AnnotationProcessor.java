@@ -47,6 +47,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 
     private final List<Processor<?>> processors = Arrays.asList(
             new IceProcessor(),
+            new IceBuilderProcessor(),
             new FactoryProcessor()
     );
 

@@ -63,6 +63,10 @@ class MethodDescriptor {
         return setter;
     }
 
+    public TypeName originalType() {
+        return originalType;
+    }
+
     public TypeName type() {
         return type;
     }
@@ -130,11 +134,13 @@ class MethodDescriptor {
     }
 
     public CodeBlock fieldMutator() {
-        String firstParamName = setter.getParameters().get(0).getSimpleName().toString();
+        return fieldMutator(setter.getParameters().get(0).getSimpleName().toString());
+    }
 
+    public CodeBlock fieldMutator(String value) {
         return fetchType == Fetch.Type.EAGER
-                ? CodeBlock.of("this.$L = $L", name, firstParamName)
-                : CodeBlock.of("this.$L.set($L)", name, firstParamName);
+                ? CodeBlock.of("this.$L = $L", name, value)
+                : CodeBlock.of("this.$L.set($L)", name, value);
 
     }
 

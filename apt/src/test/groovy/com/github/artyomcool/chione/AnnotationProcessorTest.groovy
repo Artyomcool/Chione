@@ -815,4 +815,75 @@ class AnnotationProcessorTest {
         assert nextEntry.data.isLoaded()
     }
 
+
+    @Test
+    @Parameters([
+            "boolean",
+            "byte",
+            "short",
+            "char",
+            "int",
+            "float",
+            "long",
+            "double",
+            "String",
+            "String[]",
+            "Boolean",
+            "Integer"
+    ])
+    void builder(def type) {
+        def factoryClass =
+                """
+                    package test;
+                    
+                    import com.github.artyomcool.chione.Factory;
+                    
+                    @Factory(root = SomeEntry.class)
+                    public interface SomeFactory {
+                        
+                        SomeEntry.Builder entryBuilder();
+                        
+                    }
+                """
+
+        def moduleClass =  """
+                    package test;
+
+                    import com.github.artyomcool.chione.Fetch;
+                    import com.github.artyomcool.chione.Ice;
+                    
+                    @Ice
+                    public interface SomeEntry {
+                       
+                        $type data();
+                        
+                        @Ice.Builder
+                        public interface Builder {
+                            Builder data($type data);
+                            SomeEntry build();
+                        }
+                        
+                    }
+
+                """
+
+        def module = generateModule("test.SomeFactoryModule", moduleClass, factoryClass)
+
+        def factory = module.factory()
+        def chione = module.chione()
+
+        def builder = factory.entryBuilder()
+        def clazz = builder.getClass().getDeclaredField("data").type;
+        def original = 90.asType(clazz)
+
+        def entry = builder.data(original).build()
+
+        chione.save(entry)
+
+        def nextEntry = chione.load()
+
+        assert nextEntry.data() == original
+    }
+
+
 }

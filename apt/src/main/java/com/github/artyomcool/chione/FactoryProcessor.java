@@ -29,7 +29,10 @@ import com.squareup.javapoet.*;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.MirroredTypeException;
+import javax.lang.model.type.TypeMirror;
+import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -115,7 +118,7 @@ class FactoryProcessor extends Processor<Factory> {
             @Override
             protected void visitExecutable(ExecutableElement executableElement) {
                 builder.addStatement("m.put($S, $T.$$generateSerializer())",
-                        executableElement.getReturnType().toString(),
+                        getIceClass(executableElement),
                         getIceClassName(executableElement));
             }
         };
@@ -184,13 +187,41 @@ class FactoryProcessor extends Processor<Factory> {
     private MethodSpec generate(ExecutableElement element) {
         MethodSpec.Builder method = MethodSpec.overriding(element);
 
-        ClassName implClassName = getIceClassName(element);
+        ClassName implClassName = getGeneratedClassName(element);
         method.addCode("return new $T();\n", implClassName);
         return method.build();
     }
 
+    private TypeMirror getIceClass(ExecutableElement element) {
+        return getIceClassOfElement(getReturnType(element).asElement());
+    }
+
+    private DeclaredType getReturnType(ExecutableElement element) {
+        return (DeclaredType)element.getReturnType();
+    }
+
     private ClassName getIceClassName(ExecutableElement element) {
-        String className = element.getReturnType().toString();
-        return ClassName.bestGuess(className + IceProcessor.GENERATED_IMPLEMENTATION_SUFFIX);
+        DeclaredType iceClass = (DeclaredType) getIceClass(element);
+        return getGeneratedName(iceClass);
+    }
+
+    private ClassName getGeneratedClassName(ExecutableElement element) {
+        DeclaredType returnType = getReturnType(element);
+        return getGeneratedName(returnType);
+    }
+
+    private ClassName getGeneratedName(DeclaredType returnType) {
+        ClassName className = ClassName.get((TypeElement) returnType.asElement());
+        return IceProcessor.getGeneratedName(className);
+    }
+
+    private TypeMirror getIceClassOfElement(Element element) {
+        if (element.getAnnotation(Ice.class) != null) {
+            return element.asType();
+        }
+        if (element.getAnnotation(Ice.Builder.class) != null) {
+            return getIceClassOfElement(element.getEnclosingElement());
+        }
+        throw new IllegalArgumentException("Type " + element + " has no @Ice annotation");
     }
 }

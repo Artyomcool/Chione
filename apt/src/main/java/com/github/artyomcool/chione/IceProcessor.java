@@ -26,10 +26,14 @@ package com.github.artyomcool.chione;
 
 import com.squareup.javapoet.*;
 
+import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeKind;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
 
 import static javax.lang.model.element.Modifier.*;
 
@@ -58,33 +62,52 @@ class IceProcessor extends Processor<Ice> {
                 .addSuperinterface(className);
 
         List<MethodDescriptor> methods = FieldAnalyzer.analyze(element);
+        Optional<? extends Element> builder = element.getEnclosedElements().stream()
+                .filter(e -> e.getAnnotation(Ice.Builder.class) != null)
+                .findAny();
 
-        for (MethodDescriptor descriptor : methods) {
-            FieldSpec.Builder builder = FieldSpec.builder(descriptor.type(), descriptor.name(), PRIVATE);
-            CodeBlock initializer = descriptor.fieldInitializer();
-            if (initializer != null) {
-                builder.initializer(initializer);
-            }
-            typeSpecBuilder.addField(builder.build());
+        if (builder.isPresent()) {
+            TypeElement builderElement = (TypeElement) builder.get();
+            ClassName builderType = ClassName.get(builderElement);
+
+            typeSpecBuilder.addMethod(MethodSpec.constructorBuilder().build());
+            typeSpecBuilder.addMethod(MethodSpec.constructorBuilder()
+                    .addParameter(getGeneratedName(builderType), "builder")
+                    .addCode(builderConstructor(FieldAnalyzer.analyze(element, builderElement)))
+                    .build());
         }
 
         for (MethodDescriptor descriptor : methods) {
-            MethodSpec getterSpec = MethodSpec.overriding(descriptor.getter())
-                    .addStatement(getterBody(descriptor))
-                    .build();
+            FieldSpec.Builder fieldBuilder = FieldSpec.builder(descriptor.type(), descriptor.name(), PRIVATE);
+            CodeBlock initializer = descriptor.fieldInitializer();
+            if (initializer != null) {
+                fieldBuilder.initializer(initializer);
+            }
+            typeSpecBuilder.addField(fieldBuilder.build());
+        }
 
-            typeSpecBuilder.addMethod(getterSpec);
+        for (MethodDescriptor descriptor : methods) {
+            ExecutableElement getter = descriptor.getter();
+            if (getter != null) {
+                MethodSpec getterSpec = MethodSpec.overriding(getter)
+                        .addStatement(getterBody(descriptor))
+                        .build();
 
-            ExecutableElement setter = descriptor.setter();
-
-            MethodSpec.Builder methodSpecBuilder = MethodSpec.overriding(setter)
-                    .addStatement(setterBody(descriptor));
-
-            if (setter.getReturnType().getKind() != TypeKind.VOID) {
-                methodSpecBuilder.addStatement("return this");
+                typeSpecBuilder.addMethod(getterSpec);
             }
 
-            typeSpecBuilder.addMethod(methodSpecBuilder.build());
+
+            ExecutableElement setter = descriptor.setter();
+            if (setter != null) {
+                MethodSpec.Builder methodSpecBuilder = MethodSpec.overriding(setter)
+                        .addStatement(setterBody(descriptor));
+
+                if (setter.getReturnType().getKind() != TypeKind.VOID) {
+                    methodSpecBuilder.addStatement("return this");
+                }
+
+                typeSpecBuilder.addMethod(methodSpecBuilder.build());
+            }
         }
 
         methods.sort(Comparator.comparing(MethodDescriptor::name));
@@ -257,6 +280,21 @@ class IceProcessor extends Processor<Ice> {
 
     private CodeBlock setterBody(MethodDescriptor descriptor) {
         return descriptor.fieldMutator();
+    }
+
+    private CodeBlock builderConstructor(List<MethodDescriptor> methods) {
+        CodeBlock.Builder result = CodeBlock.builder();
+        for (MethodDescriptor descriptor : methods) {
+            if (descriptor.setter() != null) {
+                result.addStatement(descriptor.fieldMutator("builder." + descriptor.name()));
+            }
+        }
+        return result.build();
+    }
+
+    static ClassName getGeneratedName(ClassName className) {
+        String name = String.join("$", className.simpleNames()) + IceProcessor.GENERATED_IMPLEMENTATION_SUFFIX;
+        return ClassName.bestGuess(name);
     }
 
 }
